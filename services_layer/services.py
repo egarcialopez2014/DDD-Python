@@ -17,12 +17,11 @@ def allocate(
         uow: AbstractUnitOfWork) -> str:
     line = model.OrderLine(orderid, sku, qty)
     with uow:
-        product = uow.products.get(sku)
+        product = uow.products.get(line.sku)
         if product is None:
             raise InvalidSku(f'Invalid sku {line.sku}')
-        batches = product.batches
-        batchref = model.allocate(line, batches)
-    return batchref
+        batchref = product.allocate(line)
+        return batchref
 
 
 def add_batch(

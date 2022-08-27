@@ -1,5 +1,5 @@
 import abc
-from typing import Any
+from typing import Any, Set
 from domain import model
 from domain.model import Product
 
@@ -9,18 +9,32 @@ class AbstractProductRepository(abc.ABC):
     Repository exists at the aggregate level, in this case Product
     """
 
-    @abc.abstractmethod
+    def __init__(self):
+        self.seen: Set[model.Product] = set()
+
     def add(self, product: Product):
         """
         Add to repository
         """
-        raise NotImplementedError
+        self._add(product)
+        self.seen.add(product)
 
-    @abc.abstractmethod
     def get(self, sku: str) -> Product:
         """
         Get from repository
         """
+        product = self._get(sku)
+        if product:
+            self.seen.add(product)
+        return product
+
+
+    @abc.abstractmethod
+    def _add(self, product: model.Product):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def _get(self, sku) -> model.Product:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -40,21 +54,21 @@ class InMemoryProductRepository(AbstractProductRepository):
 
     def __init__(self,
                  products=None) -> None:
+        super().__init__()
         if products:
             self._products = set(products)
         else:
             self._products = set()
         self.committed = False  # No impact of real in memory implications but useful for testing
 
-    def add(self, item):
+    def _add(self, item):
         if isinstance(item, Product):
             self._products.add(item)
         else:
             raise Exception("Trying to add something that is not a Product")
 
-    def get(self, sku) -> model.Product:
+    def _get(self, sku) -> model.Product:
         return next((p for p in self._products if p.sku == sku), None)
-
 
     def commit(self, *args):
         self.committed = True  # No impact of real in memory implications but useful for testing
@@ -62,16 +76,16 @@ class InMemoryProductRepository(AbstractProductRepository):
     def list(self):
         return list(self._products)
 
-
 class SqlAlchemyProductRepository(AbstractProductRepository):
     def __init__(self, session):
+        super().__init__()
         self.session = session
 
-    def add(self, product):
+    def _add(self, product):
         self.session.add(product)
 
-    def get(self, sku) -> model.Product:
-        return self.session.query(model.Product).filter_by(sku=sku).one()
+    def _get(self, sku) -> model.Product:
+        return self.session.query(model.Product).filter_by(sku=sku).first()
 
     def list(self):
         return self.session.query(model.Product).all()

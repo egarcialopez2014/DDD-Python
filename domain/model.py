@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import List, Optional
 from domain.domain_types import Reference
+from domain import events
 
 
 
@@ -60,6 +61,7 @@ class Product:
         self.sku = sku
         self.batches = batches
         self.version_number = version_number
+        self.events = []
 
     def allocate(self, line: OrderLine) -> str:
         try:
@@ -70,7 +72,8 @@ class Product:
             self.version_number += 1
             return batch.reference
         except StopIteration:
-            raise OutOfStock(f'Out of Stock for sku {line.sku}')
+            self.events.append(events.OutofStock(line.sku))
+            # raise OutOfStock(f'Out of Stock for sku {line.sku}')
 
     def __str__(self):
         return f'product with sku: {self.sku} and {len(self.batches)} batches'
@@ -78,6 +81,7 @@ class Product:
 
 class OutOfStock(Exception):
     pass
+
 
 def allocate(line: OrderLine, batches: List[Batch]) -> Reference:
     try:
