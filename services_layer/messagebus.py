@@ -1,18 +1,26 @@
 import email
 
 from domain import events
+from services_layer.handlers import *
 
 
-def handle(event: events.Event):
-    for handler in HANDLERS[type(event)]:
-        handler(event)
+def handle(
+        event: events.Event,
+        uow: AbstractUnitOfWork):
+    results = []
+    queue = [event]
+    while queue:
+        event = queue.pop(0)
+        for handler in HANDLERS[type(event)]:
+            results.append(handler(event, uow=uow))
+            queue.extend(uow.collect_new_events())
+    return results
 
-def send_out_of_stock_notification(event: events.OutofStock):
-    email.send_mail(
-        'stock@made.com',
-        f'OutofStock for {event.sku}'
-    )
+
 
 HANDLERS = {
     events.OutofStock: [send_out_of_stock_notification],
+    events.AllocationRequired: [allocate],
+    events.BatchCreated: [add_batch],
+    events.BatchQuantityChanged: [change_batch_quantity]
 }

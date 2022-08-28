@@ -2,6 +2,7 @@ import abc
 from typing import Any, Set
 from domain import model
 from domain.model import Product
+from adapters import orm
 
 
 class AbstractProductRepository(abc.ABC):
@@ -28,6 +29,11 @@ class AbstractProductRepository(abc.ABC):
             self.seen.add(product)
         return product
 
+    def get_by_batchref(self, batchref) -> model.Product:
+        product = self._get_by_batchref(batchref)
+        if product:
+            self.seen.add(product)
+        return product
 
     @abc.abstractmethod
     def _add(self, product: model.Product):
@@ -35,6 +41,10 @@ class AbstractProductRepository(abc.ABC):
 
     @abc.abstractmethod
     def _get(self, sku) -> model.Product:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def _get_by_batchref(self, batchref) -> model.Product:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -70,6 +80,10 @@ class InMemoryProductRepository(AbstractProductRepository):
     def _get(self, sku) -> model.Product:
         return next((p for p in self._products if p.sku == sku), None)
 
+    def _get_by_batchref(self, batchref) -> model.Product:
+        return next((
+            p for p in self._products for b in p.batches if b.reference == batchref), None)
+
     def commit(self, *args):
         self.committed = True  # No impact of real in memory implications but useful for testing
 
@@ -86,6 +100,10 @@ class SqlAlchemyProductRepository(AbstractProductRepository):
 
     def _get(self, sku) -> model.Product:
         return self.session.query(model.Product).filter_by(sku=sku).first()
+
+    def _get_by_batchref(self, batchref) -> model.Product:
+        return self.session.query(model.Product).join(model.Batch)\
+                    .filter(orm.batches.c.reference == batchref,).first()
 
     def list(self):
         return self.session.query(model.Product).all()

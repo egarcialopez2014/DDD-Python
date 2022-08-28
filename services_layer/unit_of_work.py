@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session, sessionmaker
 import config
 
 from adapters import repository
-from services_layer import messagebus
+
 
 
 class AbstractUnitOfWork(abc.ABC):
@@ -26,13 +26,11 @@ class AbstractUnitOfWork(abc.ABC):
 
     def commit(self):
         self._commit() # this gets implemented only in the real classes
-        self.publish_events()
 
-    def publish_events(self):
+    def collect_new_events(self):
         for product in self.products.seen:
             while product.events:
-                event = product.events.pop(0)
-                messagebus.handle(event)
+                yield product.events.pop(0)
 
     @abc.abstractmethod
     def rollback(self, exc_type, exc_val):
@@ -56,7 +54,7 @@ DEFAULT_FACTORY = sessionmaker().configure(bind=config.get_inmemory_uri())
 
 class SqlAlchemyUnitOfWork(AbstractUnitOfWork):
 
-    def __init__(self, session_factory = DEFAULT_FACTORY):
+    def __init__(self, session_factory=DEFAULT_FACTORY):
         self.session_factory = session_factory
 
     def __enter__(self):
