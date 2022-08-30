@@ -1,7 +1,8 @@
 
 from services_layer.unit_of_work import AbstractUnitOfWork
-from domain import model, events
+from domain import model, events, commands
 import email
+from adapters import redis_eventpublisher
 
 
 class InvalidSku(Exception):
@@ -13,9 +14,9 @@ def is_valid_sku(sku, batches):
 
 
 def allocate(
-        event: events.AllocationRequired,
+        command: commands.Allocate,
         uow: AbstractUnitOfWork) -> str:
-    line = model.OrderLine(event.orderid, event.sku, event.qty)
+    line = model.OrderLine(command.orderid, command.sku, command.qty)
     with uow:
         product = uow.products.get(line.sku)
         if product is None:
@@ -25,14 +26,14 @@ def allocate(
 
 
 def add_batch(
-        event: events.BatchCreated,
+        command: commands.CreateBatch,
         uow: AbstractUnitOfWork):
     with uow:
-        product = uow.products.get(sku=event.sku)
+        product = uow.products.get(sku=command.sku)
         if product is None:
-            product = model.Product(event.sku, batches=[])
+            product = model.Product(command.sku, batches=[])
             uow.products.add(product)
-        product.batches.append(model.Batch(event.ref, event.sku, event.qty, event.eta))
+        product.batches.append(model.Batch(command.ref, command.sku, command.qty, command.eta))
 
 
 def send_out_of_stock_notification(
@@ -45,8 +46,12 @@ def send_out_of_stock_notification(
 
 
 def change_batch_quantity(
-        event: events.BatchQuantityChanged,
+        command: commands.ChangeBatchQuantity,
         uow: AbstractUnitOfWork):
     with uow:
-        product = uow.products.get_by_batchref(batchref = event.ref)
-        product.change_batch_quantity(ref=event.ref, qty=event.qty)
+        product = uow.products.get_by_batchref(batchref = command.ref)
+        product.change_batch_quantity(ref=command.ref, qty=command.qty)
+
+
+def publish_allocated_event(event: events.Allocated, uow:AbstractUnitOfWork):
+    redis_eventpublisher.publish('line_allocated', event)

@@ -38,7 +38,7 @@ def test_uow_can_retrieve_a_batch_and_allocate_to_it(session_factory):
     insert_batch(session, "batch1", "HIPSTER-WORKBENCH", 100, None)
     session.commit()
 
-    uow = unit_of_work.SqlAlchemyProductUnitOfWork(session_factory)
+    uow = unit_of_work.SqlAlchemyUnitOfWork(session_factory)
     with uow:
         product = uow.products.get(sku="HIPSTER-WORKBENCH")
         line = model.OrderLine("o1", "HIPSTER-WORKBENCH", 10)
@@ -49,7 +49,7 @@ def test_uow_can_retrieve_a_batch_and_allocate_to_it(session_factory):
 
 
 def test_rolls_back_uncommitted_work_by_default(session_factory):
-    uow = unit_of_work.SqlAlchemyProductUnitOfWork(session_factory)
+    uow = unit_of_work.SqlAlchemyUnitOfWork(session_factory)
     with uow:
         insert_batch(uow.session, "batch1", "MEDIUM-PLINTH", 100, None)
 
@@ -62,7 +62,7 @@ def test_rolls_back_on_error(session_factory):
     class MyException(Exception):
         pass
 
-    uow = unit_of_work.SqlAlchemyProductUnitOfWork(session_factory)
+    uow = unit_of_work.SqlAlchemyUnitOfWork(session_factory)
     with pytest.raises(MyException):
         with uow:
             insert_batch(uow.session, "batch1", "LARGE-FORK", 100, None)
@@ -76,7 +76,7 @@ def test_rolls_back_on_error(session_factory):
 def try_to_allocate(orderid, sku, exceptions):
     line = model.OrderLine(orderid, sku, 10)
     try:
-        with unit_of_work.SqlAlchemyProductUnitOfWork() as uow:
+        with unit_of_work.SqlAlchemyUnitOfWork() as uow:
             product = uow.products.get(sku=sku)
             product.allocate(line)
             time.sleep(0.2)
@@ -118,5 +118,5 @@ def test_concurrent_updates_to_version_are_not_allowed(session_factory):
         dict(sku=sku),
     )
     assert orders.rowcount == 1
-    with unit_of_work.SqlAlchemyProductUnitOfWork(session_factory) as uow:
+    with unit_of_work.SqlAlchemyUnitOfWork(session_factory) as uow:
         uow.session.execute("select 1")

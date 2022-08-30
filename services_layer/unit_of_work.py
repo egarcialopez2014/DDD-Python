@@ -27,10 +27,10 @@ class AbstractUnitOfWork(abc.ABC):
     def commit(self):
         self._commit() # this gets implemented only in the real classes
 
-    def collect_new_events(self):
+    def collect_new_messages(self):
         for product in self.products.seen:
-            while product.events:
-                yield product.events.pop(0)
+            while product.messages:
+                yield product.messages.pop(0)
 
     @abc.abstractmethod
     def rollback(self, exc_type, exc_val):

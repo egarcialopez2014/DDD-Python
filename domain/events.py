@@ -17,10 +17,11 @@ class BatchCreated(Event):
     eta: Optional[date] = None
 
 @dataclass
-class AllocationRequired(Event):
+class Allocated(Event):
     orderid: str
     sku: str
     qty: int
+    batchref: str
 
 @dataclass
 class BatchQuantityChanged(Event):
